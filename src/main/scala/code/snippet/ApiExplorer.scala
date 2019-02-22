@@ -17,7 +17,7 @@ import net.liftweb.json.{Extraction, JsonParser}
 
 import scala.xml.{NodeSeq, Text}
 // for compact render
-import code.lib.ObpAPI.{allBanks, getEntitlementRequestsV300, getEntitlementsV300, getGlossaryItemsJson, getResourceDocsJson, isLoggedIn, getMessageDocsJson}
+import code.lib.ObpAPI.{allBanks, getEntitlementRequestsV300, getEntitlementsV300, getGlossaryItemsJson, getResourceDocsJson, isLoggedIn, getMessageDocsJson, getPropsValue}
 import net.liftweb.common._
 import net.liftweb.http.CurrentReq
 import net.liftweb.http.SHtml.{ajaxSelect, ajaxSubmit, text}
@@ -259,7 +259,7 @@ WIP to add comments on resource docs. This code copied from Sofit.
 
 
   // If there is a main purpose of the sandbox, then know that.
-  val defaultCatalog = Props.get("defaultCatalog", "")
+  val defaultCatalog = getPropsValue("defaultCatalog", "")
 
 
   val showCore = showCoreParam
@@ -408,7 +408,7 @@ WIP to add comments on resource docs. This code copied from Sofit.
 
 
     // To link to API home page (this is duplicated in OAuthClient)
-    val baseUrl = Props.get("api_hostname", S.hostName)
+    val baseUrl = getPropsValue("api_hostname", S.hostName)
 
 
     // Use to show the developer the current base version url
@@ -964,7 +964,7 @@ WIP to add comments on resource docs. This code copied from Sofit.
 
     // So we can highlight (or maybe later exclusively show) the "active" banks in a sandbox.
     // Filter out empty string items
-    val featuredBankIds = Props.get("featuredBankIds", "").split(",").toList.filter(i => i.length > 0)
+    val featuredBankIds = getPropsValue("featuredBankIds", "").split(",").toList.filter(i => i.length > 0)
 
 
 

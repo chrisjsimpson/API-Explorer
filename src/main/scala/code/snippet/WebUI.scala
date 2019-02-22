@@ -27,17 +27,18 @@ Berlin 13359, Germany
 
 package code.snippet
 
-import code.util.Helper.MdcLoggable
+import net.liftweb.common.{Loggable}
+
+import code.lib.ObpAPI.{getPropsValue}
 import net.liftweb.http.{S, SessionVar}
 import net.liftweb.util.Helpers._
 import net.liftweb.util.{CssSel, Props, _}
 
-import code.util.Branding._
 
 
 
 
-class WebUI extends MdcLoggable {
+class WebUI extends Loggable {
 
   @transient protected val log = logger //Logger(this.getClass)
 

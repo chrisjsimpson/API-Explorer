@@ -1,6 +1,7 @@
 package code.lib
 
 import java.io._
+import net.liftweb.common.{Logger}
 import java.net.{HttpURLConnection, URL}
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -8,7 +9,7 @@ import java.util.Date
 import code.lib.ObpJson._
 import code.util.Helper.MdcLoggable
 import net.liftweb.common.{Box, Failure, Full, _}
-import net.liftweb.http.RequestVar
+import net.liftweb.http.{RequestVar, S}
 import net.liftweb.json.JsonAST.{JBool, JValue}
 import net.liftweb.json.JsonDSL._
 import net.liftweb.json._
@@ -30,6 +31,111 @@ object ObpAPI extends Loggable {
 
   implicit val formats = DefaultFormats
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+
+  /**
+  * This function is implemented in order to support loading props from either
+  * system environment (default) or props file (fallback).
+  */
+  def getPropsValue(nameOfProperty: String): Box[String] = {
+
+    val brandSpecificPropertyName = getBrandSpecificPropertyName(nameOfProperty)
+
+    logger.debug(s"Standard property $nameOfProperty has bankSpecificPropertyName: $brandSpecificPropertyName")
+    //Replace "." with "_" (environment vars cannot include ".") and convert to upper case
+    val sysEnvironmentPropertyName = brandSpecificPropertyName.replace('.', '_').toUpperCase()
+    var environmentValue: Box[String] = tryo{sys.env(sysEnvironmentPropertyName)}
+    //First check if value is set from system environment, if not find then from the liftweb props file
+    environmentValue match {
+      case Full(_) => 
+        logger.info(s"Getting $sysEnvironmentPropertyName setting from sys environment")
+        environmentValue
+      case _ => 
+        logger.info(s"Getting $brandSpecificPropertyName setting from props file")
+        Props.get(brandSpecificPropertyName) //Fallback to props file
+    }
+  }
+
+  /** Check the id values from GUI, such as ACCOUNT_ID, BANK_ID ...  */
+  def isValidID(id :String):Boolean= {
+    val regex = """^([A-Za-z0-9\-_.]+)$""".r
+    id match {
+      case regex(e) if(e.length<256) => true
+      case _ => false
+    }
+  }  
+
+  def getPropsValue(nameOfProperty: String, defaultValue: String): String = {
+    getPropsValue(nameOfProperty) openOr(defaultValue)
+  }
+
+  def getPropsAsBoolValue(nameOfProperty: String, defaultValue: Boolean): Boolean = {
+    getPropsValue(nameOfProperty) map(toBoolean) openOr(defaultValue)
+  }
+  def getPropsAsIntValue(nameOfProperty: String): Box[Int] = {
+    getPropsValue(nameOfProperty) map(toInt)
+  }
+  def getPropsAsIntValue(nameOfProperty: String, defaultValue: Int): Int = {
+    getPropsAsIntValue(nameOfProperty) openOr(defaultValue)
+  }
+  def getPropsAsLongValue(nameOfProperty: String): Box[Long] = {
+    getPropsValue(nameOfProperty) flatMap(asLong)
+  }
+  def getPropsAsLongValue(nameOfProperty: String, defaultValue: Long): Long = {
+    getPropsAsLongValue(nameOfProperty) openOr(defaultValue)
+  }  
+
+  /*
+    Get any brand specified in url parameter or form field, validate it, and if all good, set the session
+    Else just return the session
+    Note there are Read and Write side effects here!
+  */
+  def activeBrand() : Option[String] = {
+
+    val brandParameter = "brand"
+
+    // Use brand in parameter (query or form)
+    val brand : Option[String] = S.param(brandParameter) match {
+      case Full(value) => {
+        // If found, and has a valid format, set the session.
+        if (isValidID(value)) {
+          S.setSessionAttribute(brandParameter, value)
+          logger.debug(s"activeBrand says: I found a $brandParameter param. $brandParameter session has been set to: ${S.getSessionAttribute(brandParameter)}")
+          Some(value)
+        } else {
+          logger.warn (s"activeBrand says: Not a valid Id.")
+          None
+        }
+      }
+      case _ =>  {
+        // Else look in the session
+        S.getSessionAttribute(brandParameter)
+      }
+    }
+    brand
+  }  
+
+  /*
+  For bank specific branding and possibly other customisations, if we have an active brand (in url param, form field, session),
+  we will look for property_FOR_BRAND_<BANK_ID>
+  We also check that the property exists, else return the standard property name.
+  */
+  def getBrandSpecificPropertyName(nameOfProperty: String) : String = {
+    // If we have an active brand, construct a target property name to look for.
+    val brandSpecificPropertyName = activeBrand() match {
+      case Some(brand) => s"${nameOfProperty}_FOR_BRAND_${brand}"
+      case _ => nameOfProperty
+    }
+
+    // Check if the property actually exits, if not, return the default / standard property name
+    val propertyToUse = Props.get(brandSpecificPropertyName) match {
+      case Full(value) => brandSpecificPropertyName
+      case _ => nameOfProperty
+    }
+
+    propertyToUse
+  }
+
+
   
   val defaultProvider = Props.get("defaultAuthProvider").getOrElse("")
   

@@ -46,6 +46,7 @@ import net.liftweb.common.{Full, Failure}
 import net.liftweb.util.Helpers
 import net.liftweb.http.LiftResponse
 import code.util.Helper.MdcLoggable
+import code.lib.ObpAPI.{getPropsValue}
 
 sealed trait Provider {
   val name : String
@@ -69,13 +70,12 @@ sealed trait Provider {
 trait DefaultProvider extends Provider with MdcLoggable {
   val name = "The Open Bank Project Demo"
   
-  // val baseUrl = Props.get("oauth_1.hostname").getOrElse(Props.get("api_hostname", S.hostName))
-  val baseUrl = Props.get("oauth_1.hostname") match {
+  val baseUrl = getPropsValue("oauth_1.hostname") match {
     case Full(v) =>
       v
     case _ =>
       logger.warn("==========>> THERE IS NO THE VALUE FOR PROPS oauth_1.hostname <<====================")
-      Props.get("api_hostname") match {
+      getPropsValue("api_hostname") match {
       case Full(v) => 
         v
       case _ =>
@@ -92,8 +92,8 @@ trait DefaultProvider extends Provider with MdcLoggable {
 
   lazy val oAuthProvider : OAuthProvider = new DefaultOAuthProvider(requestTokenUrl, accessTokenUrl, authorizeUrl)
 
-  val consumerKey = Props.get("obp_consumer_key", "")
-  val consumerSecret = Props.get("obp_secret_key", "")
+  val consumerKey: String = getPropsValue("obp_consumer_key") openOr ""
+  val consumerSecret: String = getPropsValue("obp_secret_key") openOr ""
 }
 
 object OBPDemo extends DefaultProvider
@@ -165,7 +165,7 @@ object OAuthClient extends MdcLoggable {
     mostRecentLoginAttemptProvider.set(Full(provider))
     val credential = setNewCredential(provider)
 
-    val authUrl = provider.oAuthProvider.retrieveRequestToken(credential.consumer, Props.get("base_url", S.hostName) + "/oauthcallback")
+    val authUrl = provider.oAuthProvider.retrieveRequestToken(credential.consumer, getPropsValue("base_url", S.hostName) + "/oauthcallback")
     S.redirectTo(authUrl)
   }
 
